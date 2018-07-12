@@ -37,8 +37,12 @@ namespace _2018_7_10_T
 
         // 实际数据采集流程
         // 0. 定义低点
-        private double thresh_low = 300;
-        private double thresh_high = 350;
+        // 0.1 IL 300
+        // private double thresh_low = 300;
+        // private double thresh_high = 350;
+        // 0.2 IL 600
+        private double thresh_low = 210;
+        private double thresh_high = 240;
 
         // 1. 连续三点
         private int continue3high = 0;
@@ -103,7 +107,7 @@ namespace _2018_7_10_T
         }
 
 
-// 添加定时器1
+        // 添加定时器1
         private void timer1_Tick(object sender, EventArgs e)
         {
             // 添加数据处理、解析部分
@@ -183,9 +187,10 @@ namespace _2018_7_10_T
             // 0 位置在300，远离最多到450，靠近可以到160
             // 整个这一段均匀分布在4-20mA
             // 所以，x = 4 对应 y = 450; x = 20 对应 y = 160
-
-            dHeight = (dmA - 4.0) * (160.0 - 450.0) / 16.0 + 450.0;
-
+            // IL300
+            //dHeight = (dmA - 4.0) * (160.0 - 450.0) / 16.0 + 450.0;
+            // IL600
+            dHeight = (dmA - 4.0) * (200.0 - 1000.0) / 16.0 + 800.0;
             // - 设置记录机制 -
             
             if (false == Sample_Start) // 如果采样没有开始
@@ -367,7 +372,7 @@ namespace _2018_7_10_T
                 }
             } */
     }      
- }
+}
        
 
    
