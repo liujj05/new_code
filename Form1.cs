@@ -6,14 +6,29 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using System.IO
+using System.IO;
 using System.IO.Ports;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace _2018_7_10_T
 {
     public partial class Form1 : Form
     {
+        //=======================================================
+        // 多线程代码，参考：https://www.cnblogs.com/wangsai/p/4113279.html
+        private delegate void FlushClient(); // 代理
+        // 读取更新数据的文件变量
+        StreamReader Data_File = null;
+        // 文件的基础名称
+        string file_base_name = "knife";
+        // 文件编号
+        int file_num = 0;
+        // 用于存储数据的list
+        List <double> chart_data_height = new List<double>();
+        List <double> chart_x_index = new List<double>();
+        //=======================================================
+
         private SerialPort comm = new SerialPort();
         private StringBuilder builder = new StringBuilder();//避免在事件处理方法中反复的创建，定义到外面。
         private long received_count = 0;//接收计数
@@ -42,7 +57,7 @@ namespace _2018_7_10_T
         // private double thresh_high = 350;
         // 0.2 IL 600
         private double thresh_low = 210;
-        private double thresh_high = 240;
+        private double thresh_high = 500;//240;
 
         // 1. 连续三点
         private int continue3high = 0;
@@ -72,12 +87,18 @@ namespace _2018_7_10_T
             // Liu - 清空，保险起见
             Array.Clear(laser_data, 0, laser_data.Length);
 
+            //===============Liu - 多线程-初始化线程===========
+            Thread t1 = new Thread(CrossThreadFlush);
+            t1.IsBackground = true;
+            t1.Start();
+            //================================================
+
             //初始化下拉串口名称列表框
             string[] ports = SerialPort.GetPortNames();
             Array.Sort(ports);
-            combo端口.Items.AddRange(ports);
-            combo端口.SelectedIndex = combo端口.Items.Count > 0 ? 0 : -1;
-            combo波特率.SelectedIndex = combo波特率.Items.IndexOf("9600");
+            combo_PortName.Items.AddRange(ports);
+            combo_PortName.SelectedIndex = combo_PortName.Items.Count > 0 ? 0 : -1;
+            combo_Baudrate.SelectedIndex = combo_Baudrate.Items.IndexOf("9600");
 
             //添加事件注册
             comm.DataReceived += comm_DataReceived;
@@ -103,9 +124,69 @@ namespace _2018_7_10_T
             imageList1.Images.Add(Image.FromFile(@"C:\Users\Administrator\Desktop\2018-7-10-T\2018-7-10-T\PNG\Circle_Grey.png"));//读取灰色图标的路径,注意更换地址
             imageList1.Images.Add(Image.FromFile(@"C:\Users\Administrator\Desktop\2018-7-10-T\2018-7-10-T\PNG\Circle_Green.png"));//读取绿色图标的路径
             imageList1.Images.Add(Image.FromFile(@"C:\Users\Administrator\Desktop\2018-7-10-T\2018-7-10-T\PNG\Circle_Red.png"));//读取红色图标的路径
-            this.pictureBox指示灯.Image = imageList1.Images[0];
+            this.pictureBox_LED.Image = imageList1.Images[0];
         }
 
+        //============================多线程相关函数=======================================
+        private void CrossThreadFlush()
+        {
+            while (true)
+            {
+                //将sleep和无限循环放在等待异步的外面
+                // liu- 看起来最终会无限循环这里面的内容了
+                Thread.Sleep(1000);
+
+                // 判断文件是否存在
+                if (!File.Exists(file_base_name+file_num))
+                    continue;
+                Data_File = null;
+                // 判断文件是否被占用
+                try
+                {
+                    Data_File = new StreamReader(file_base_name + file_num, false);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                // 如果以上两步通过，说明文件存在，开始读取
+                file_num++; // 文件编号自增，下次不读这次的了
+                chart_data_height.Clear();
+                chart_x_index.Clear();
+                string str = "";
+                double x_index = 0;
+                while (true)
+                {
+                    str = Data_File.ReadLine();
+                    if (null == str)
+                        break;
+                    else
+                    {
+                        chart_data_height.Add(System.Convert.ToDouble(str));
+                        chart_x_index.Add(x_index);
+                        x_index = x_index + 1;
+                    }
+                }
+                
+                // 开始绘制
+                ThreadFunction();
+            }
+        }
+        private void ThreadFunction()
+        {
+            if (this.textBox1.InvokeRequired)//等待异步 
+            {
+                FlushClient fc = new FlushClient(ThreadFunction);
+                this.Invoke(fc);//通过代理调用刷新方法 
+            }
+            else
+            {
+                // this.textBox1.Text = DateTime.Now.ToString();
+                chart1.Series[0].Points.DataBindXY(chart_x_index, chart_data_height);
+            }
+        }
+        //================================================================================
 
         // 添加定时器1
         private void timer1_Tick(object sender, EventArgs e)
@@ -134,17 +215,17 @@ namespace _2018_7_10_T
 
             if (temp < 3)
             {
-                pictureBox指示灯.Image = imageList1.Images[temp++];
+                pictureBox_LED.Image = imageList1.Images[temp++];
             }
             else
             {
                 temp = 1;
-                pictureBox指示灯.Image = imageList1.Images[0];
+                pictureBox_LED.Image = imageList1.Images[0];
             }
         }
 
 
-        private void ReceivedData(string data)
+        private void ReceivedData(byte[] data)
         {
             this.timer1.Stop();
             //================Liu 代码=========================
@@ -313,8 +394,8 @@ namespace _2018_7_10_T
         {
             Text = "程序启动，串口打开";
             //-------------------------Liu 打开串口前要对参数进行配置 --------------------------
-            comm.PortName = combo端口.Text;
-            comm.BaudRate = int.Parse(combo波特率.Text);
+            comm.PortName = combo_PortName.Text;
+            comm.BaudRate = int.Parse(combo_Baudrate.Text);
             
             // ------------------------Liu 打开失败要停止流程防止错误 --------------------------
             try
@@ -348,6 +429,7 @@ namespace _2018_7_10_T
         private void buttonStop_Click(object sender, EventArgs e)
         {
             Text = "停止运行，串口关闭";
+            this.timer1.Stop();
             comm.Close();//串口关闭
             MessageBox.Show("程序停止，串口关闭");
         }
