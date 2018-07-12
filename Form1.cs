@@ -65,7 +65,7 @@ namespace _2018_7_10_T
         // private double thresh_high = 350;
         // 0.2 IL 600
         private double thresh_low = 210;
-        private double thresh_high = 500;//240;
+        private double thresh_high = 240;
 
         // 1. 连续三点
         private int continue3high = 0;
@@ -201,7 +201,7 @@ namespace _2018_7_10_T
                 for (int i = 0; i < loop_max; i++)
                 {
                     delta_height.Add( chart_data_height[i] - Standard_height[i] );
-                    chart_x_index.Add( (double)(i) )
+                    chart_x_index.Add((double)(i));
                     average_db = average_db + delta_height[i];
                 }
                 average_db = average_db / (double)(loop_max);
@@ -226,7 +226,7 @@ namespace _2018_7_10_T
             else
             {
                 // this.textBox1.Text = DateTime.Now.ToString();
-                chart1.Series[0].Points.DataBindXY(chart_x_index, chart_data_height);
+                chart1.Series[0].Points.DataBindXY(chart_x_index, delta_height);
                 textBox1.Text = average_db.ToString();
                 textBox2.Text = stdeval_db.ToString();
             }
