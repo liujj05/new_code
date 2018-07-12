@@ -63,9 +63,9 @@ namespace _2018_7_10_T
             InitializeComponent();
         }
  
-       private void Form1_Load(object sender, EventArgs e) 
-       {
-           // Liu - 清空，保险起见
+        private void Form1_Load(object sender, EventArgs e) 
+        {
+            // Liu - 清空，保险起见
             Array.Clear(laser_data, 0, laser_data.Length);
 
             //初始化下拉串口名称列表框
@@ -100,26 +100,49 @@ namespace _2018_7_10_T
             imageList1.Images.Add(Image.FromFile(@"C:\Users\Administrator\Desktop\2018-7-10-T\2018-7-10-T\PNG\Circle_Green.png"));//读取绿色图标的路径
             imageList1.Images.Add(Image.FromFile(@"C:\Users\Administrator\Desktop\2018-7-10-T\2018-7-10-T\PNG\Circle_Red.png"));//读取红色图标的路径
             this.pictureBox指示灯.Image = imageList1.Images[0];
-       }
-       private int temp = 0;
-       private void buttonTest_Click(object sender, EventArgs e)
-       {
-
-           if (temp < 3)
-           {
-               pictureBox指示灯.Image = imageList1.Images[temp++];
-           }
-           else
-           {
-               temp = 1;
-               pictureBox指示灯.Image = imageList1.Images[0];
-           }
-       }
+        }
 
 
-       private void ReceivedData(string data)
-       {
-           this.timer1.Stop();
+// 添加定时器1
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            // 添加数据处理、解析部分
+            //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - batch_received_count is {0}", batch_received_count);
+            if (batch_received_count == 7)
+            {
+                
+                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 6 is {0}", recv_buff[6]);
+                ReceivedData(laser_data);
+                
+            }
+
+            else if (recv_OK == false)
+            {
+                System.Diagnostics.Debug.WriteLine("Timer1 -- receive not OK!");
+                timer_ON = false;
+            }
+        }
+
+
+        private int temp = 0;
+        private void buttonTest_Click(object sender, EventArgs e)
+        {
+
+            if (temp < 3)
+            {
+                pictureBox指示灯.Image = imageList1.Images[temp++];
+            }
+            else
+            {
+                temp = 1;
+                pictureBox指示灯.Image = imageList1.Images[0];
+            }
+        }
+
+
+        private void ReceivedData(string data)
+        {
+            this.timer1.Stop();
             //================Liu 代码=========================
             //Step 1. 判断前三个是否为固定开头数据
             // byte[] batchdata = System.Text.Encoding.Default.GetBytes(data);
@@ -219,40 +242,40 @@ namespace _2018_7_10_T
             comm.Write(laser_send_chars, 0, 8);
             this.timer1.Start();
             // SetChartData(dHeight);
-       }
-       //图表的代码
-       private int nRow = 1;
-       private delegate void DelegateCChart(double data);
-       private void SetChartData(double data)
-       {
-           try
-           {
-               if (chart1.InvokeRequired)
-               {
-                   DelegateCChart md = new DelegateCChart(SetChartData);
-                   this.Invoke(md, new object[] { data });
-               }
-               else
-               {
-                   chart1.Series[0].Points.AddXY(nRow, data);
-                   nRow++;
-               }
+        }
+        //图表的代码
+        private int nRow = 1;
+        private delegate void DelegateCChart(double data);
+        private void SetChartData(double data)
+        {
+            try
+            {
+                if (chart1.InvokeRequired)
+                {
+                    DelegateCChart md = new DelegateCChart(SetChartData);
+                    this.Invoke(md, new object[] { data });
+                }
+                else
+                {
+                    chart1.Series[0].Points.AddXY(nRow, data);
+                    nRow++;
+                }
 
-           }
-           catch (System.Exception ex)
-           {
-               MessageBox.Show(ex.Message.ToString());
-           }
-       }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message.ToString());
+            }
+        }
 
-       // --------------------------------------- 接收串口信息 ----------------------------------------
-       void comm_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        // --------------------------------------- 接收串口信息 ----------------------------------------
+        void comm_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             
 
 
             int n = comm.BytesToRead;//
-         
+            
             received_count += n;//增加接收计数
             comm.Read(recv_buff, 0, n);//读取缓冲数据
 
@@ -281,12 +304,42 @@ namespace _2018_7_10_T
         // --------------------------------------------------------------------------------------------------
         
        
-       private void Start_Click(object sender, EventArgs e)
-       {
-           Text = "程序启动，串口打开";
-           comm.Open();//串口打开
-           MessageBox.Show("程序启动，串口打开");
-       }
+        private void Start_Click(object sender, EventArgs e)
+        {
+            Text = "程序启动，串口打开";
+            //-------------------------Liu 打开串口前要对参数进行配置 --------------------------
+            comm.PortName = combo端口.Text;
+            comm.BaudRate = int.Parse(combo波特率.Text);
+            
+            // ------------------------Liu 打开失败要停止流程防止错误 --------------------------
+            try
+            {
+                comm.Open();
+            }
+            catch(Exception ex)
+            {
+                //捕获到异常信息，创建一个新的comm对象，之前的不能用了。
+                comm = new SerialPort();
+                //现实异常信息给客户。
+                MessageBox.Show(ex.Message);
+                return;
+            }
+
+            MessageBox.Show("程序启动，串口打开");
+
+            // 后续代码为启动代码
+            if (timer_ON)
+            {
+                timer_ON = false;
+                this.timer1.Stop();
+            }
+            else
+            {
+                comm.Write(laser_send_chars, 0, 8);
+                this.timer1.Start();
+                timer_ON = true;
+            }
+        }
         private void buttonStop_Click(object sender, EventArgs e)
         {
             Text = "停止运行，串口关闭";
@@ -313,7 +366,7 @@ namespace _2018_7_10_T
                     MessageBox.Show(ex.Message);
                 }
             } */
-        }      
+    }      
  }
        
 
