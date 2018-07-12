@@ -27,6 +27,11 @@ namespace _2018_7_10_T
         // 用于存储数据的list
         List <double> chart_data_height = new List<double>();
         List <double> chart_x_index = new List<double>();
+
+        // 用于采集统计数据的list
+        List <double> delta_height = new List<double>();
+        // 用于保存标准数据的list
+        List <double> Standard_height = new List<double>();
         //=======================================================
 
         private SerialPort comm = new SerialPort();
@@ -168,7 +173,7 @@ namespace _2018_7_10_T
                         x_index = x_index + 1;
                     }
                 }
-                
+                Data_File.Close();
                 // 开始绘制
                 ThreadFunction();
             }
