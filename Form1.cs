@@ -32,6 +32,9 @@ namespace _2018_7_10_T
         List <double> delta_height = new List<double>();
         // 用于保存标准数据的list
         List <double> Standard_height = new List<double>();
+        int standard_data_num = 0;
+        double average_db = 0;  // 平均值
+        double stdeval_db = 0;  // 标准差
         //=======================================================
 
         private SerialPort comm = new SerialPort();
@@ -91,6 +94,24 @@ namespace _2018_7_10_T
         {
             // Liu - 清空，保险起见
             Array.Clear(laser_data, 0, laser_data.Length);
+
+            // 载入标准刀具文件 - 这里假设这个文件肯定有
+            Standard_height.Clear();
+            StreamReader sr_standard_file = new StreamReader("StandardKnife", false);
+            string str_data = "";
+            while (true)
+            {
+                str_data = sr_standard_file.ReadLine();
+                if (null == str_data)
+                    break;
+                else
+                {
+                    Standard_height.Add(System.Convert.ToDouble(str_data));
+                    standard_data_num++;
+                }
+            }
+            sr_standard_file.Close();
+
 
             //===============Liu - 多线程-初始化线程===========
             Thread t1 = new Thread(CrossThreadFlush);
@@ -159,6 +180,7 @@ namespace _2018_7_10_T
                 file_num++; // 文件编号自增，下次不读这次的了
                 chart_data_height.Clear();
                 chart_x_index.Clear();
+                delta_height.Clear();
                 string str = "";
                 double x_index = 0;
                 while (true)
@@ -169,11 +191,27 @@ namespace _2018_7_10_T
                     else
                     {
                         chart_data_height.Add(System.Convert.ToDouble(str));
-                        chart_x_index.Add(x_index);
+                        // chart_x_index.Add(x_index); // 这回要画的不是绝对高度是相对误差量
                         x_index = x_index + 1;
                     }
                 }
                 Data_File.Close();
+                // 计算均值
+                int loop_max = System.Math.Min((int)(x_index), standard_data_num);
+                for (int i = 0; i < loop_max; i++)
+                {
+                    delta_height.Add( chart_data_height[i] - Standard_height[i] );
+                    chart_x_index.Add( (double)(i) )
+                    average_db = average_db + delta_height[i];
+                }
+                average_db = average_db / (double)(loop_max);
+                // 计算方差
+                for (int i = 0; i < loop_max; i++)
+                {
+                    stdeval_db = stdeval_db + (delta_height[i] - average_db) * (delta_height[i] - average_db);
+                }
+                stdeval_db = stdeval_db / (double)(loop_max); // 这是方差
+                // stdeval_db = System.Math.Sqrt(stdeval_db); // 这是标准差
                 // 开始绘制
                 ThreadFunction();
             }
@@ -189,6 +227,8 @@ namespace _2018_7_10_T
             {
                 // this.textBox1.Text = DateTime.Now.ToString();
                 chart1.Series[0].Points.DataBindXY(chart_x_index, chart_data_height);
+                textBox1.Text = average_db.ToString();
+                textBox2.Text = stdeval_db.ToString();
             }
         }
         //================================================================================
