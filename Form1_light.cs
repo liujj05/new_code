@@ -41,11 +41,13 @@ namespace _2018_7_10_T
         // 启动检测延时和启动终止延时
         int start_inlier_num = 10;  // 连续几个点位于探测区间内时开始存数据
         int stop_outlier_num = 3;   // 连续几个点位于探测区间外时终止存数据
-        double dist_far_lim = 240;  // 探测区间上限
-        double dist_near_lim = 210; // 探测区间下限
+        const double dist_far_lim = 240;  // 探测区间上限
+        const double dist_near_lim = 210; // 探测区间下限
 
         //=======================================================
         // 多线程代码，参考：https://www.cnblogs.com/wangsai/p/4113279.html
+
+        Thread t1;
         private delegate void FlushClient(); // 代理
         // 读取更新数据的文件变量
         StreamReader Data_File = null;
@@ -117,7 +119,7 @@ namespace _2018_7_10_T
         private bool Sample_Start = false;
         // 4. 刀片数量编号，用来命名数据文件
         private int Knife_num = 0;
-
+        
         // -----------------------------------------------------------------------------------------------
 
 
@@ -154,7 +156,7 @@ namespace _2018_7_10_T
 
 
             //===============Liu - 多线程-初始化线程===========
-            Thread t1 = new Thread(CrossThreadFlush);
+            t1 = new Thread(CrossThreadFlush);
             t1.IsBackground = true;
             //t1.Start();
             //================================================
@@ -186,11 +188,11 @@ namespace _2018_7_10_T
             // }
 
 
-
-            imageList1.Images.Add(Image.FromFile(@"..\\..\\PNG\Circle_Grey.png"));//读取灰色图标的路径,注意更换地址
-            imageList1.Images.Add(Image.FromFile(@"..\\..\\PNG\Circle_Green.png"));//读取绿色图标的路径
-            imageList1.Images.Add(Image.FromFile(@"..\\..\\PNG\Circle_Red.png"));//读取红色图标的路径
-            imageList1.Images.Add(Image.FromFile(@"..\\..\\PNG\Circle_Yellow.png"));//读取黄色图标的路径
+            // 注意,@的作用是"过滤转义字符",就是说\\可以写成\
+            imageList1.Images.Add(Image.FromFile(@"..\..\PNG\Circle_Grey.png"));//读取灰色图标的路径,注意更换地址
+            imageList1.Images.Add(Image.FromFile(@"..\..\PNG\Circle_Green.png"));//读取绿色图标的路径
+            imageList1.Images.Add(Image.FromFile(@"..\..\PNG\Circle_Red.png"));//读取红色图标的路径
+            imageList1.Images.Add(Image.FromFile(@"..\..\PNG\Circle_Yellow.png"));//读取黄色图标的路径
 
             this.pictureBox_LED.Image = imageList1.Images[0];
         }
@@ -411,7 +413,7 @@ namespace _2018_7_10_T
                         continue3low = 0;
                         Sample_Start = true;
                         // 黄灯闪烁表示测量开始
-                        yellow_toggle = true;
+                        toggle_light = true;
                     }
                 }
                 else
@@ -447,7 +449,7 @@ namespace _2018_7_10_T
                         Sample_Start = false;
 
                         // 黄灯停止闪烁
-                        yellow_toggle = false;
+                        toggle_light = false;
                     }
                 }
                 else
