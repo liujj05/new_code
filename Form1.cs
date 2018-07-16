@@ -11,10 +11,39 @@ using System.IO.Ports;
 using System.Text.RegularExpressions;
 using System.Threading;
 
+// 理想过程是
+// 刀具进入测量范围 dist_near_lim 后，传感器必然测量到3个以上连续数据点位于
+// [0, dist_near_lim] 当中，此时开始测量取点。
+
+// 采点的过程当中，点与激光测距仪的距离可以超出 dist_near_lim （如果 
+// dist_near_lim 比 dist_far_lim 小的话），但是不能超出 dist_far_lim 3点
+// 以上，否则采样终止
+
+// 虽然理论上 dist_near_lim 与 dist_far_lim 的大小关系不应该受限，但是如果
+// dist_far_lim 比 dist_near_lim 小会造成一个问题，可能采集刚开始就结束了
+
+// 所以调试过程当中，最好指示灯在采样开始和采样终止的时候都能有不同的显示！
+// 同时，应该能设置一种情况，无条件进入采集，并可控退出
+
+
+
 namespace _2018_7_10_T
 {
     public partial class Form1 : Form
     {
+        // 可能需要频繁调整的参数
+        // ---------------------------统计量限制------------------------------
+        // 目前暂时没有启用
+        double thresh_average_high = 0;     // 均值上限
+        double thresh_average_low = 0;      // 均值下限
+        double thresh_dev = 0;              // 方差 or 标准差 上限
+
+        // 启动检测延时和启动终止延时
+        int start_inlier_num = 10;  // 连续几个点位于探测区间内时开始存数据
+        int stop_outlier_num = 3;   // 连续几个点位于探测区间外时终止存数据
+        double dist_far_lim = 240;  // 探测区间上限
+        double dist_near_lim = 210; // 探测区间下限
+
         //=======================================================
         // 多线程代码，参考：https://www.cnblogs.com/wangsai/p/4113279.html
         private delegate void FlushClient(); // 代理
@@ -34,7 +63,7 @@ namespace _2018_7_10_T
         List <double> Standard_height = new List<double>();
         int standard_data_num = 0;
         double average_db = 0;  // 平均值
-        double stdeval_db = 0;  // 标准差
+        double stdeval_db = 0;  // 标准差-但是目前输出的是方差
         //=======================================================
 
         private SerialPort comm = new SerialPort();
@@ -64,10 +93,10 @@ namespace _2018_7_10_T
         // private double thresh_low = 300;
         // private double thresh_high = 350;
         // 0.2 IL 600
-        private double thresh_low = 210;
-        private double thresh_high = 240;
+        private double thresh_low = dist_near_lim;
+        private double thresh_high = dist_far_lim;
 
-        // 1. 连续三点
+        // 1. 连续三点 - “三”这个数字需要视情况进行调整
         private int continue3high = 0;
         private int continue3low = 0;
         // 2. 数据缓冲区
@@ -321,7 +350,7 @@ namespace _2018_7_10_T
             
             if (false == Sample_Start) // 如果采样没有开始
             {
-                if (dHeight < thresh_low) // 进入连续接近三点的判断
+                if (dHeight < thresh_low) // 进入连续接近三点的判断，目前，是否存这几个过度点还是个问题
                 {
                     height_data[continue3low++] = dHeight;
                     if (continue3low == 3)
