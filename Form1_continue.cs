@@ -14,6 +14,10 @@ namespace SerialportSample
 {
     public partial class SerialportSampleForm : Form
     {
+        // 文件保存：
+        StreamWriter sw;
+        int file_seq_num = 0;
+
         int start_inlier_num = 10;
         //==========================
 
@@ -109,21 +113,7 @@ namespace SerialportSample
             //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - batch_received_count is {0}", batch_received_count);
             if (batch_received_count == 7)
             {
-                //this.timer1.Stop();
-                //System.Diagnostics.Debug.WriteLine("========================================");
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 0 is {0}", recv_buff[0]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 1 is {0}", recv_buff[1]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 2 is {0}", recv_buff[2]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 3 is {0}", recv_buff[3]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 4 is {0}", recv_buff[4]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 5 is {0}", recv_buff[5]);
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 6 is {0}", recv_buff[6]);
                 ReceivedData(laser_data);
-                //batch_received_count = 0;
-                //laser_data_index = 0;
-                
-                //comm.Write(laser_send_chars, 0, 8);
-                //this.timer1.Start();
             }
 
             else if (recv_OK == false)
@@ -204,68 +194,11 @@ namespace SerialportSample
             //dHeight = (dmA - 4.0) * (160.0 - 450.0) / 16.0 + 450.0;
             // IL600
             dHeight = (dmA - 4.0) * (200.0 - 1000.0) / 16.0 + 1000.0;
+            
 
-            // - 设置记录机制 -
-            /*
-            if (false == Sample_Start) // 如果采样没有开始
-            {
-                if (dHeight < thresh_low) // 进入连续接近三点的判断
-                {
-                    height_data[continue3low++] = dHeight;
-                    if (continue3low == 3)
-                    {
-                        System.Diagnostics.Debug.WriteLine("###DEBUG### - 3 low OK, Sample START!");
-                        height_data_num = 3;
-                        continue3low = 0;
-                        Sample_Start = true;
-                    }
-                }
-                else
-                    continue3low = 0;
-            }
-            else // 采样开始
-            {
-                
-                if (height_data_num < 512)
-                {
-                    height_data[height_data_num++] = dHeight;
-                }
-                else
-                {
-                    height_data_num = 1000;
-                    System.Diagnostics.Debug.WriteLine("###DEBUG### - Data Number is bigger than 512 !");
-                }
-                
+            sw.WriteLine("{0}\t{1}", dHeight, dmA);
 
-                if (dHeight > thresh_high) // 进入连续远离三点的判断
-                {
-                    continue3high++;
-                    if (continue3high == 3)
-                    {
-                        System.Diagnostics.Debug.WriteLine("###DEBUG### - 3 High is OK, Sample STOP!");
-                        if (height_data_num != 1000)
-                            height_data_num = height_data_num - 3;
-                        continue3high = 0;
-                        // 保存数据到文件，注意，这时要停掉定时器，但是目前定时器操作部分有一些在函数外部，
-                        // 所以这项工作留待后续统一做
-                        StreamWriter sw = new StreamWriter("knife" + Knife_num, false);
-                        for (int i=0; i<height_data_num; i++)
-                        {
-                            sw.WriteLine("{0}", height_data[i]);
-                        }
-                        Knife_num++;
-                        sw.Flush();
-                        sw.Close();
-
-                        // 停止采样
-                        Sample_Start = false;
-                    }
-                }
-                else
-                    continue3high = 0;
-            }
-            */
-
+            
             batch_received_count = 0;
             laser_data_index = 0;
             comm.Write(laser_send_chars, 0, 8);
@@ -299,8 +232,6 @@ namespace SerialportSample
 
         void comm_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
-            
-
 
             int n = comm.BytesToRead;//先记录下来，避免某种原因，人为的原因，操作几次之间时间长，缓存不一致
          
@@ -311,23 +242,11 @@ namespace SerialportSample
             // Liu - Plan B 无脑收，只管是不是该清空了
             batch_received_count += n;
             for (int i=0; i<n; i++)
-            {
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### laser_data_index is {0}", laser_data_index);
-                
-                
+            {             
                 laser_data[laser_data_index++] = recv_buff[i];
-
             }
 
-            // 测试代码
-            /*
-            System.Diagnostics.Debug.WriteLine("###DEBUG### - comm_DataReceived");
-            System.Diagnostics.Debug.WriteLine("###DEBUG### - comm_DataReceived recv_num is {0}", n);
-            for (int i=0; i<7; i++)
-            {
-                System.Diagnostics.Debug.WriteLine("###DEBUG### - comm_DataReceived {0} is {1}", i, recv_buff[i]);
-            }
-            */
+            
         }
 
         private void buttonOpenClose_Click(object sender, EventArgs e)
@@ -374,9 +293,16 @@ namespace SerialportSample
             {
                 timer_ON = false;
                 this.timer1.Stop();
+
+                sw.flush();
+                sw.close();
             }
             else
             {
+                // 新建文件
+
+                sw = new StreamWriter("data_seq" + file_seq_num, false);
+                file_seq_num++;
                 comm.Write(laser_send_chars, 0, 8);
                 this.timer1.Start();
                 timer_ON = true;
