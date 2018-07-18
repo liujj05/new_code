@@ -12,15 +12,15 @@ using System.Text.RegularExpressions;
 using System.Threading;
 
 // 理想过程是
-// 刀具进入测量范围 dist_near_lim 后，传感器必然测量到3个以上连续数据点位于
-// [0, dist_near_lim] 当中，此时开始测量取点。
+// 刀具进入测量范围 db_near_limit 后，传感器必然测量到3个以上连续数据点位于
+// [0, db_near_limit] 当中，此时开始测量取点。
 
-// 采点的过程当中，点与激光测距仪的距离可以超出 dist_near_lim （如果 
-// dist_near_lim 比 dist_far_lim 小的话），但是不能超出 dist_far_lim 3点
+// 采点的过程当中，点与激光测距仪的距离可以超出 db_near_limit （如果 
+// db_near_limit 比 db_far_limit 小的话），但是不能超出 db_far_limit 3点
 // 以上，否则采样终止
 
-// 虽然理论上 dist_near_lim 与 dist_far_lim 的大小关系不应该受限，但是如果
-// dist_far_lim 比 dist_near_lim 小会造成一个问题，可能采集刚开始就结束了
+// 虽然理论上 db_near_limit 与 db_far_limit 的大小关系不应该受限，但是如果
+// db_far_limit 比 db_near_limit 小会造成一个问题，可能采集刚开始就结束了
 
 // 所以调试过程当中，最好指示灯在采样开始和采样终止的时候都能有不同的显示！
 // 同时，应该能设置一种情况，无条件进入采集，并可控退出
@@ -32,17 +32,23 @@ namespace _2018_7_10_T
     public partial class Form1 : Form
     {
         // 可能需要频繁调整的参数
+        // ------------------------文件处理过滤程序----------------------------
+        const double data_up_lim = 347;
+        const double data_down_lim = 342;
+        const double error_lim = 2;
         // ---------------------------统计量限制------------------------------
-        // 目前暂时没有启用
-        double thresh_average_high = 0;     // 均值上限
-        double thresh_average_low = 0;      // 均值下限
-        double thresh_dev = 0;              // 方差 or 标准差 上限
+        const double thresh_average_high = 0.6;       // #CHANGE# 均值上限
+        const  double thresh_average_low = 0.3;        // #CHANGE# 均值下限
+        const double thresh_dev = 0.02;               // #CHANGE# 方差 or 标准差 上限
 
         // 启动检测延时和启动终止延时
-        int start_inlier_num = 10;  // 连续几个点位于探测区间内时开始存数据
-        int stop_outlier_num = 3;   // 连续几个点位于探测区间外时终止存数据
-        const double dist_far_lim = 370;  // 探测区间上限
-        const double dist_near_lim = 350; // 探测区间下限
+        const int min_in_number = 20;       // #CHANGE# 连续几个点位于探测区间内时开始存数据
+        const int min_sample_num = 120;     // #CHANGE# 采集此数目点之后才决定是否停止采集
+        
+        const int stop_outlier_num = 3;     // 连续几个点位于探测区间外时终止存数据
+
+        const double db_far_limit = 360;    // #CHANGE# 探测区间上限
+        const double db_near_limit = 350;   // #CHANGE# 探测区间下限
 
         //=======================================================
         // 多线程代码，参考：https://www.cnblogs.com/wangsai/p/4113279.html
@@ -63,6 +69,8 @@ namespace _2018_7_10_T
         List <double> delta_height = new List<double>();
         // 用于保存标准数据的list
         List <double> Standard_height = new List<double>();
+        // 用于进行统计学运算的list
+        List <double> Statistics_delta = new List<double>();
         int standard_data_num = 0;
         double average_db = 0;  // 平均值
         double stdeval_db = 0;  // 标准差-但是目前输出的是方差
@@ -106,8 +114,8 @@ namespace _2018_7_10_T
         // private double thresh_low = 300;
         // private double thresh_high = 350;
         // 0.2 IL 600
-        private double thresh_low = dist_near_lim;
-        private double thresh_high = dist_far_lim;
+        private double thresh_low = db_near_limit;
+        private double thresh_high = db_far_limit;
 
         // 1. 连续三点 - “三”这个数字需要视情况进行调整
         private int continue3high = 0;
@@ -200,6 +208,11 @@ namespace _2018_7_10_T
         //============================多线程相关函数=======================================
         private void CrossThreadFlush()
         {
+            double data_read_in;    // 读入的采集数据
+            double delta_temp;      // 计算的高度差值
+            int average_num = 0;    // 参与计算平均值的数据个数
+            double avearge_temp = 0;
+            double stdeval_temp = 0;
             while (false == thread_exit)
             {
                 //将sleep和无限循环放在等待异步的外面
@@ -227,6 +240,10 @@ namespace _2018_7_10_T
                 chart_data_height.Clear();
                 chart_x_index.Clear();
                 delta_height.Clear();
+                Statistics_delta.Clear();
+                avearge_temp = 0;
+                stdeval_temp = 0;
+                average_num = 0;
                 string str = "";
                 double x_index = 0;
                 while (true)
@@ -246,24 +263,63 @@ namespace _2018_7_10_T
                 int loop_max = System.Math.Min((int)(x_index), standard_data_num);
                 for (int i = 0; i < loop_max; i++)
                 {
-                    delta_height.Add( chart_data_height[i] - Standard_height[i] );
+                    // 加入判断性语句
+                    // 1. 读入高度数据
+                    data_read_in = chart_data_height[i];
+                    // 2. 判断是否在阈值范围以内
+                    if ( (data_read_in < data_up_lim) && (data_read_in > data_down_lim) )
+                    {
+                        // 注意：标准高度肯定比读进来的高度更大，因为更远离传感器
+                        delta_temp = Standard_height[i] - chart_data_height[i];
+                        // 判断正负
+                        if (delta_temp > 0)
+                        {
+                            delta_height.Add( delta_temp );
+                            Statistics_delta.Add( delta_temp );
+                            average_temp = average_temp + delta_temp;
+                            average_num++;
+                        }
+                        else
+                            delta_height.Add( 0 );    
+                    }
+                    else
+                    {
+                        delta_height.Add( 0 );
+                    }
+                    
                     chart_x_index.Add((double)(i));
-                    average_db = average_db + delta_height[i];
+
+                    
                 }
-                average_db = average_db / (double)(loop_max);
+                average_db = average_temp / (double)(average_num);
                 // 计算方差
-                for (int i = 0; i < loop_max; i++)
+                for (int i = 0; i < average_num; i++)
                 {
-                    stdeval_db = stdeval_db + (delta_height[i] - average_db) * (delta_height[i] - average_db);
+                    stdeval_temp = stdeval_temp + (Statistics_delta[i] - average_db) * (Statistics_delta[i] - average_db);
                 }
-                stdeval_db = stdeval_db / (double)(loop_max); // 这是方差
+                stdeval_db = stdeval_temp / (double)(average_num); // 这是方差
                 // stdeval_db = System.Math.Sqrt(stdeval_db); // 这是标准差
 
                 // 质量判定
-                if (true)
-                    light_condition = 1;
+                if ( (average_db < thresh_average_high) && (average_db > thresh_average_low) )
+                {
+                    System.Diagnostics.Debug.WriteLine("###DEBUG### - Average is OK!");
+                    if (stdeval_db < thresh_dev)
+                    {
+                        System.Diagnostics.Debug.WriteLine("###DEBUG### - Stdeval is OK!");
+                        light_condition = 1;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("###DEBUG### - Stdeval is NOT OK!");
+                        light_condition = 2;
+                    }
+                }
                 else
+                {
+                    System.Diagnostics.Debug.WriteLine("###DEBUG### - Average is NOT OK!");
                     light_condition = 2;
+                }
 
 
                 // 开始绘制
@@ -407,9 +463,9 @@ namespace _2018_7_10_T
                 if (dHeight < thresh_low) // 进入连续接近三点的判断，目前，是否存这几个过度点还是个问题
                 {
                     height_data[continue3low++] = dHeight;
-                    if (continue3low == 3)
+                    if (continue3low == min_in_number)
                     {
-                        height_data_num = 3;
+                        height_data_num = min_in_number;
                         continue3low = 0;
                         Sample_Start = true;
                         // 黄灯闪烁表示测量开始
@@ -426,7 +482,7 @@ namespace _2018_7_10_T
                 else
                     height_data_num = 1000;
 
-                if (dHeight > thresh_high) // 进入连续远离三点的判断
+                if ((dHeight > thresh_high) && (height_data_num > min_sample_num)) // 进入连续远离三点的判断
                 {
                     continue3high++;
                     if (continue3high == 3)
