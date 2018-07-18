@@ -294,8 +294,8 @@ namespace SerialportSample
                 timer_ON = false;
                 this.timer1.Stop();
 
-                sw.flush();
-                sw.close();
+                sw.Flush();
+                sw.Close();
             }
             else
             {
