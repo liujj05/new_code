@@ -25,12 +25,12 @@ namespace SerialportSample
     public partial class SerialportSampleForm : Form
     {
         // 用于排除外点的两个参数 建议实际调试的时候改成 349 347
-        const double db_far_limit = 360;
-        const double db_near_limit = 350;
+        const double db_far_limit = 360;    // #CHANGE#
+        const double db_near_limit = 350;   // #CHANGE#
 
         // 用于滤除采集过程中的干扰
-        const int min_in_number = 20;
-        const int min_sample_num = 120;
+        const int min_in_number = 20;       // #CHANGE#
+        const int min_sample_num = 120;     // #CHANGE#
         //==========================
 
         private SerialPort comm = new SerialPort();
