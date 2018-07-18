@@ -41,8 +41,8 @@ namespace _2018_7_10_T
         // 启动检测延时和启动终止延时
         int start_inlier_num = 10;  // 连续几个点位于探测区间内时开始存数据
         int stop_outlier_num = 3;   // 连续几个点位于探测区间外时终止存数据
-        const double dist_far_lim = 240;  // 探测区间上限
-        const double dist_near_lim = 210; // 探测区间下限
+        const double dist_far_lim = 370;  // 探测区间上限
+        const double dist_near_lim = 350; // 探测区间下限
 
         //=======================================================
         // 多线程代码，参考：https://www.cnblogs.com/wangsai/p/4113279.html
@@ -399,7 +399,7 @@ namespace _2018_7_10_T
             // IL300
             //dHeight = (dmA - 4.0) * (160.0 - 450.0) / 16.0 + 450.0;
             // IL600
-            dHeight = (dmA - 4.0) * (200.0 - 1000.0) / 16.0 + 800.0;
+            dHeight = (dmA - 4.0) * (200.0 - 1000.0) / 16.0 + 1000.0;
             // - 设置记录机制 -
             
             if (false == Sample_Start) // 如果采样没有开始
